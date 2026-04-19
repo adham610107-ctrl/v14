@@ -1196,33 +1196,62 @@ function showCertificate(){
     forceCloseAllModals();document.getElementById('modal-cert').style.display='flex';
     confetti({particleCount:300,spread:130,origin:{y:0.5},colors:['#D4AF37','#FFF8E7','#FFFFFF']});
 }
-async function downloadCertificate(){
-    const certEl=document.getElementById('printable-cert');if(!certEl)return;
-    const btn=document.querySelector('.cert-download-btn');
-    if(btn){btn.innerText='⏳ Tayyorlanmoqda...';btn.disabled=true;}
-    try{
-        // html-to-image — glassmorphism va CSS effektlarni to'g'ri oladi
-        const dataUrl = await htmlToImage.toPng(certEl, {
-            pixelRatio: 3,
-            backgroundColor: null,  // shaffof fon (CSS background saqlanadi)
-            cacheBust: true,
-            style: { borderRadius: '10px' }
-        });
-        const link=document.createElement('a');
-        link.download=`muttest_Sertifikat_${(currentUser||'Talaba').replace(/\s/g,'_')}.png`;
-        link.href=dataUrl; link.click();
-        sendLog('cert_download',{user:currentUser,mode:testModeName});
-    }catch(e){
-        // Fallback: html2canvas
-        try{
-            const canvas=await html2canvas(certEl,{scale:2,backgroundColor:'#0A0A0A',useCORS:true});
-            const link=document.createElement('a');
-            link.download='muttest_Sertifikat.png';
-            link.href=canvas.toDataURL('image/png');link.click();
-        }catch(e2){window.print();}
-    }finally{if(btn){btn.innerText='⬇ Yuklab olish (PNG)';btn.disabled=false;}}
-}
+async function downloadCertificate() {
+    const certEl = document.getElementById('printable-cert');
+    if (!certEl) return;
+    const btn = document.querySelector('.cert-download-btn');
+    if (btn) { btn.innerText = '⏳ Tayyorlanmoqda...'; btn.disabled = true; }
 
+    const imgOpts = {
+        pixelRatio: 3,
+        backgroundColor: '#0A0A0A',
+        useCORS: true,
+        allowTaint: true,
+        skipFonts: false,
+        cacheBust: true,
+        style: { borderRadius: '10px' }
+    };
+
+    try {
+        // === SAFARI/iOS HACK: 2 marta render ===
+        // 1-chi chaqiruv — brauzer keshiga shrift va rasmlarni yozish uchun
+        await htmlToImage.toPng(certEl, imgOpts);
+
+        // 100ms kutish — Safari shriftlar va CORS resurslarni to'liq o'qisin
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // 2-chi chaqiruv — haqiqiy, to'liq render
+        const dataUrl = await htmlToImage.toPng(certEl, imgOpts);
+
+        const link = document.createElement('a');
+        link.download = `muttest_Sertifikat_${(currentUser || 'Talaba').replace(/\s/g, '_')}.png`;
+        link.href = dataUrl;
+        link.click();
+        sendLog('cert_download', { user: currentUser, mode: testModeName });
+
+    } catch (e) {
+        console.warn('html-to-image xato:', e);
+        // Fallback: html2canvas
+        try {
+            const scale = Math.max(window.devicePixelRatio || 1, 2);
+            const canvas = await html2canvas(certEl, {
+                scale,
+                backgroundColor: '#0A0A0A',
+                useCORS: true,
+                allowTaint: true,
+                logging: false
+            });
+            const link = document.createElement('a');
+            link.download = `muttest_Sertifikat_${(currentUser || 'Talaba').replace(/\s/g, '_')}.png`;
+            link.href = canvas.toDataURL('image/png', 1.0);
+            link.click();
+        } catch (e2) {
+            window.print();
+        }
+    } finally {
+        if (btn) { btn.innerText = '⬇ Yuklab olish (PNG)'; btn.disabled = false; }
+    }
+}
 // ============================================================
 // LIQUID GYROSCOPE — Haqiqiy suv fizikasi effekti
 // ============================================================
